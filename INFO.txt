@@ -1,0 +1,16 @@
+INFO A montrer  : 
+- Nom de la ville, 
+    - Attr : NOM_USUEL
+- Date,
+    - Attr : AAAAMM
+- température,
+    - Attr : TM,
+- Precipité de neige par rapport a l altitude et a la date,
+    - Attr : ALTI, HNEIGEFTOT
+
+
+
+Peut etre une case avec des le saviez vous.
+  - Jour d d’ensoleillement.
+  - Nbr de grêle, ou orage, ou brouillard
+  - Nombre d'habitants, 
