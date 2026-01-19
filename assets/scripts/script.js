@@ -7,7 +7,7 @@ const dateMaxInput = document.getElementById("dateMaxInput");
 const dateMinInput = document.getElementById("dateMinInput");
 
 // CARTE
-let map = L.map('map',{dragging: true}).setView([44.6636,6.2631], 8); // Département de l'AIN
+let map = L.map('map',{dragging: true}).setView([44.6636,6.2631], 8);
 // Ajout d'une couche de tuiles
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 	attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -431,6 +431,7 @@ fetch("actions/getAllPing.php", {
 })
 .catch(error => console.error("Erreur :", error));
 
+//retracte
 let retracteState = false // false=> pas retracter
 const mapContainer = document.querySelector("div.div2");
 const tempGraphContainer = document.querySelector("div.div3");
@@ -462,7 +463,7 @@ function SwitchRetracteMap(){
 	}else{
 
 		mapContainer.style.transition = "1s";
-		mapContainer.style.height = "150%";
+		mapContainer.style.height = "200%";
 
 		mapContainer.addEventListener("transitionend", ()=>{
 			mapContainer.style.transition = "unset";
@@ -471,8 +472,8 @@ function SwitchRetracteMap(){
 		})
 
 		tempGraphContainer.style.transition = "1s";
-		tempGraphContainer.style.transform = "translateY(33%)";
-		tempGraphContainer.style.height = "65%";
+		tempGraphContainer.style.transform = "translateY(60%)";
+		tempGraphContainer.style.height = "60%";
 
 		tempGraphContainer.addEventListener("transitionend", ()=>{
 			tempGraphContainer.style.transition = "unset";
@@ -501,8 +502,8 @@ function SelectPlace(nomUsuel){
 	.then(response => response.json()) 
 	.then(data => {
 		data = data[0];
-		let dateMax = data["MAX(AAAAMM)"].slice(0,4) + "-" + data["MAX(AAAAMM)"].slice(4);
-		let dateMin = data["MIN(AAAAMM)"].slice(0,4) + "-" + data["MIN(AAAAMM)"].slice(4);
+		let dateMax = dateStringFormatConversion(data["MAX(AAAAMM)"]);
+		let dateMin = dateStringFormatConversion(data["MIN(AAAAMM)"]);
 
 		dateMaxInput.max  = dateMax;
 		dateMaxInput.min = dateMin;
@@ -511,22 +512,38 @@ function SelectPlace(nomUsuel){
 		dateMinInput.min = dateMin;
 
 		//checker si les values sont pas en dehors du min max
+		dateMinInput.value = (dateStringFormatConversion(dateMinInput.value) < dateMin)?
+			(dateMin):
+			(dateStringFormatConversion(dateMinInput.value) > dateMax)?
+			(dateMax):
+			(dateMinInput.value);
+		dateMaxInput.value = (dateStringFormatConversion(dateMaxInput.value) < dateMin)?
+			(dateMin):
+			(dateStringFormatConversion(dateMaxInput.value) > dateMax)?
+			(dateMax):
+			(dateMaxInput.value);
 
+		//on declenche les AEL
+		dateMaxInput.dispatchEvent(new Event("change"));
+		dateMinInput.dispatchEvent(new Event("change"));
 	})
 	.catch(error => console.error("Erreur :", error));
 
 	MakeTempGraph();
+	MakeSnowGraph();
 }
 
 //Les inputs date
 dateMinInput.addEventListener("change", ()=>{
 	dateMinGlobal = dateStringFormatConversion(dateMinInput.value);
 	MakeTempGraph();
+	MakeSnowGraph();
 });
 
 dateMaxInput.addEventListener("change", ()=>{
 	dateMaxGlobal = dateStringFormatConversion(dateMaxInput.value);
 	MakeTempGraph();
+	MakeSnowGraph();
 });
 
 function dateStringFormatConversion(date){
@@ -540,6 +557,9 @@ function dateStringFormatConversion(date){
 
 
 
+const recapInfoSpans = document.getElementsByClassName("recapInfo");
+
+
 //Graph de Temp
 const tempGraphCanvas = document.getElementById("tempGraph")
 let tempGraph = new Chart(tempGraphCanvas, {
@@ -548,9 +568,9 @@ let tempGraph = new Chart(tempGraphCanvas, {
     	labels: [],
         datasets: [{ 
 			data: [],
-			label: "Graphique des températures annuelles",
-			backgroundColor : "#8e5ea2",
-			borderColor: "#3e11cd",
+			label: "Graphique des moyennes de températures mensuelles",
+			backgroundColor : "#d93e3e",
+			borderColor: "#d60909",
 			fill: true,
     	}]
     },
@@ -562,10 +582,9 @@ let tempGraph = new Chart(tempGraphCanvas, {
 
 function MakeTempGraph(){
 
-	if(nomUsuelGlobal == "	" || dateMinGlobal == "" || dateMaxGlobal == ""){
-		console.log("Erreur");
-		return;
-	}
+	if(nomUsuelGlobal == "	" || dateMinGlobal == "" || dateMaxGlobal == "")return;	//pas de données
+
+
 	let data = new FormData();
 	data.append("nomUsuel", nomUsuelGlobal);
 	data.append("dateMin", dateMinGlobal);
@@ -577,32 +596,176 @@ function MakeTempGraph(){
 	})
 	.then(response => response.json())  
 	.then(data => {
-		console.log(data["AAAAMM"])
-		let dateData = [];
-		let tempData = [];
-		data.forEach(element => {
-			dateData.push(dateStringFormatConversion(element["AAAAMM"]));
-			tempData.push(element["TM"])
-		});
 
-		data = data[0];
-		tempGraph.destroy();
-		tempGraph = new Chart(tempGraphCanvas, {
-			type:'line',
-			data: {
-				labels: dateData,
-				datasets: [{ 
-					data: tempData,
-					label: "Graphique des températures annuelles",
-					backgroundColor : "#8e5ea2",
-					borderColor: "#3e11cd",
-					fill: true,
-				}]
-			},
-			options:{
-				maintainAspectRatio: false
-			},
-		})
+		if(data[0] != undefined){
+			document.querySelector("#tempGraphContainer").style.display = "block";
+			document.querySelector(".div3 > div:first-of-type").style.display = "none";
+
+			let dateData = [];
+			let tempData = [];
+			data.forEach(element => {
+				dateData.push(element["annee"]);
+				tempData.push(element["moyenneAnnuelle"])
+			});
+
+			tempGraph.destroy();
+
+			tempGraph = new Chart(tempGraphCanvas, {
+				type:'line',
+				data: {
+					labels: dateData,
+					datasets: [{ 
+						data: tempData,
+						label: "Graphique des températures annuelles",
+						backgroundColor : "#d93e3e",
+						borderColor: "#d60909",
+						fill: true,
+						trendlineLinear: {
+							colorMin: '#000000',
+							colorMax: '#000000',
+                        	lineStyle: 'solid',
+                        	width: 1,
+						}
+					}],
+					
+					
+				},
+				options:{
+					maintainAspectRatio: false
+				},
+				
+			});
+
+			recapInfoSpans[0].textContent = nomUsuelGlobal;
+			recapInfoSpans[1].textContent = dateStringFormatConversion(dateMinGlobal);
+			recapInfoSpans[2].textContent = dateStringFormatConversion(dateMaxGlobal);
+
+			recapInfoSpans[3].textContent = (temperatureTrend(tempData) > 0)?("augmentation"):("diminution")
+			recapInfoSpans[4].textContent = temperatureTrend(tempData) + "%"
+
+		}else{
+			document.querySelector("#tempGraphContainer").style.display = "none";
+			document.querySelector(".div3 > div:first-of-type").style.display = "flex";
+		}
+		
 	})
 	.catch(error => console.error("Erreur :", error));
+}
+
+//Graph de neige
+const snowGraphCanvas = document.getElementById("snowGraph");
+let snowGraph = new Chart(snowGraphCanvas, {
+	type:'line',
+	data: {
+    	labels: [],
+        datasets: [{ 
+			data: [],
+			label: "Graphique des moyennes des chutes de neiges annuelles",
+			backgroundColor : "#8e5ea2",
+			borderColor: "#3e11cd",
+			fill: true,
+    	}]
+    },
+	options:{
+		maintainAspectRatio: false
+	},
+})
+
+function MakeSnowGraph(){
+	if(nomUsuelGlobal == "	" || dateMinGlobal == "" || dateMaxGlobal == "")return;	//pas de données
+
+	let data = new FormData();
+	data.append("nomUsuel", nomUsuelGlobal);
+	data.append("dateMin", dateMinGlobal);
+	data.append("dateMax", dateMaxGlobal);
+
+	fetch("actions/getSnowData.php", {
+			method: "POST",
+			body: data
+	})
+	.then(response => response.json())  
+	.then(data => {
+
+		if(data[0] != undefined){
+			document.querySelector("#snowGraphContainer").style.display = "block";
+			document.querySelector(".div5 > div:first-of-type").style.display = "none";
+
+			let dateData = [];
+			let snowData = [];
+			let nbMoisData = [];
+			data.forEach(element => {
+				dateData.push(element["annee"]);
+				snowData.push(element["moyenneAnnuelle"]);
+				nbMoisData.push(element["nb_mois"]);
+			});
+			snowGraph.destroy();
+			
+			snowGraph = new Chart(snowGraphCanvas, {
+				type:'bar',
+				data: {
+					labels: dateData,
+					datasets: [{ 
+						data: snowData,
+						label: "Graphique des températures annuelles",
+						backgroundColor : "#4c77dd",
+						borderColor: "#3e11cd",
+						fill: true,
+						trendlineLinear: {
+                                colorMin: '#000000',
+                                colorMax: '#000000',
+                                lineStyle: 'solid',
+                                width: 1,
+						}
+					}]
+				},
+				options:{
+					maintainAspectRatio: false,
+					plugins: {
+						tooltip: {
+							callbacks: {
+								label: function(context) {
+								const label = context.dataset.label || '';
+								const value = context.parsed.y;
+								const nbMois = nbMoisData[context.dataIndex];
+
+								return [
+									label + ' : ' + value + ' cm',
+									'La moyenne a été fait sur '+ nbMois+ ' mois'
+								];
+								}
+							}
+						}
+ 					},
+				},
+			});
+
+			recapInfoSpans[0].textContent = nomUsuelGlobal;
+			recapInfoSpans[1].textContent = dateStringFormatConversion(dateMinGlobal);
+			recapInfoSpans[2].textContent = dateStringFormatConversion(dateMaxGlobal);
+
+			recapInfoSpans[5].textContent = (temperatureTrend(snowData) > 0)?("augmentation"):("diminution")
+			recapInfoSpans[6].textContent = temperatureTrend(snowData) + "%"
+
+		}else{
+			document.querySelector("#snowGraphContainer").style.display = "none";
+			document.querySelector(".div5 > div:first-of-type").style.display = "flex";
+		}
+		
+	})
+	.catch(error => console.error("Erreur :", error));
+}
+
+function temperatureTrend(values) {
+  const n = values.length;
+  const x = [...Array(n).keys()]; // temps (index)
+
+  const sumX = x.reduce((a, b) => a + b, 0);
+  const sumY = values.reduce((a, b) => a + b, 0);
+  const sumXY = x.reduce((s, xi, i) => s + xi * values[i], 0);
+  const sumX2 = x.reduce((s, xi) => s + xi * xi, 0);
+
+  const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+
+  const slopePercent = Number((slope*100).toFixed(2));
+  return slopePercent;
 }
